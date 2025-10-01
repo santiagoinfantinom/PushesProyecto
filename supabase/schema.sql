@@ -10,6 +10,11 @@ create table if not exists public.pushes (
 alter table public.pushes enable row level security;
 
 -- Simple policy: allow anon to read, insert and delete (adjust for your needs)
-create policy if not exists "Allow read" on public.pushes for select using (true);
-create policy if not exists "Allow insert" on public.pushes for insert with check (true);
-create policy if not exists "Allow delete" on public.pushes for delete using (true);
+drop policy if exists "Allow read" on public.pushes;
+create policy "Allow read" on public.pushes for select using (true);
+
+drop policy if exists "Allow insert" on public.pushes;
+create policy "Allow insert" on public.pushes for insert with check (true);
+
+drop policy if exists "Allow delete" on public.pushes;
+create policy "Allow delete" on public.pushes for delete using (true);
