@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { PushItem } from '@/types/push';
+import StatsCards from '@/components/StatsCards';
+import WeeklyChart from '@/components/WeeklyChart';
 
 export default function Home() {
 	const [githubLink, setGithubLink] = useState('');
@@ -123,40 +125,56 @@ export default function Home() {
 	}
 
 	return (
-		<div className="max-w-2xl mx-auto p-6 space-y-8">
-			<h1 className="text-2xl font-semibold">Seguimiento de Pushes</h1>
-			<form onSubmit={onSubmit} className="space-y-4">
-				<div>
-					<label className="block text-sm font-medium">Link de GitHub</label>
-					<input
-						type="url"
-						value={githubLink}
-						onChange={(e) => setGithubLink(e.target.value)}
-						placeholder="https://github.com/usuario/repo/commit/sha"
-						className="mt-1 w-full border rounded px-3 py-2"
-						required
-					/>
+		<div className="max-w-6xl mx-auto p-6 space-y-8">
+			<h1 className="text-3xl font-bold text-center mb-8">Seguimiento de Pushes</h1>
+			
+			{/* Dashboard de Estadísticas */}
+			<StatsCards pushes={pushes} />
+			
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				{/* Formulario */}
+				<div className="space-y-6">
+					<h2 className="text-2xl font-semibold">Agregar Push</h2>
+					<form onSubmit={onSubmit} className="space-y-4">
+						<div>
+							<label className="block text-sm font-medium">Link de GitHub</label>
+							<input
+								type="url"
+								value={githubLink}
+								onChange={(e) => setGithubLink(e.target.value)}
+								placeholder="https://github.com/usuario/repo/commit/sha"
+								className="mt-1 w-full border rounded px-3 py-2"
+								required
+							/>
+						</div>
+						<div>
+							<label className="block text-sm font-medium">Comentario</label>
+							<textarea
+								value={comment}
+								onChange={(e) => setComment(e.target.value)}
+								placeholder="Qué cambiaste en este push"
+								className="mt-1 w-full border rounded px-3 py-2 h-24"
+								required
+							/>
+						</div>
+						<button
+							type="submit"
+							disabled={loading}
+							className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
+						>
+							{loading ? 'Guardando...' : 'Guardar'}
+						</button>
+						{error && <p className="text-red-600 text-sm">{error}</p>}
+					</form>
 				</div>
+				
+				{/* Gráfico Semanal */}
 				<div>
-					<label className="block text-sm font-medium">Comentario</label>
-					<textarea
-						value={comment}
-						onChange={(e) => setComment(e.target.value)}
-						placeholder="Qué cambiaste en este push"
-						className="mt-1 w-full border rounded px-3 py-2 h-24"
-						required
-					/>
+					<WeeklyChart pushes={pushes} />
 				</div>
-				<button
-					type="submit"
-					disabled={loading}
-					className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
-				>
-					{loading ? 'Guardando...' : 'Guardar'}
-				</button>
-				{error && <p className="text-red-600 text-sm">{error}</p>}
-			</form>
+			</div>
 
+			{/* Historial */}
 			<div className="space-y-3">
 				<div className="flex justify-between items-center">
 					<h2 className="text-xl font-medium">Historial</h2>
