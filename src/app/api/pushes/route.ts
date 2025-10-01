@@ -37,3 +37,24 @@ export async function POST(request: Request) {
 	}
 	return NextResponse.json({ push: data }, { status: 201 });
 }
+
+export async function DELETE(request: Request) {
+	const { searchParams } = new URL(request.url);
+	const id = searchParams.get('id');
+	
+	if (!id) {
+		return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+	}
+	
+	const supabase = getSupabaseServer();
+	const { error } = await supabase
+		.from('pushes')
+		.delete()
+		.eq('id', id);
+	
+	if (error) {
+		return NextResponse.json({ error: error.message }, { status: 500 });
+	}
+	
+	return NextResponse.json({ success: true }, { status: 200 });
+}

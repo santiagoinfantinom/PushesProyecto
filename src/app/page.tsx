@@ -99,6 +99,29 @@ export default function Home() {
 		}
 	}
 
+	async function deletePush(id: string) {
+		if (!confirm('¿Estás seguro de que quieres eliminar este push?')) {
+			return;
+		}
+
+		try {
+			const res = await fetch(`/api/pushes?id=${id}`, {
+				method: 'DELETE',
+			});
+
+			if (!res.ok) {
+				const data = await res.json();
+				throw new Error(data.error || 'Error eliminando');
+			}
+
+			// Reload history
+			await loadPushes();
+		} catch (err) {
+			console.error('Error deleting push:', err);
+			setError(`Error eliminando: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+		}
+	}
+
 	return (
 		<div className="max-w-2xl mx-auto p-6 space-y-8">
 			<h1 className="text-2xl font-semibold">Seguimiento de Pushes</h1>
@@ -172,9 +195,18 @@ export default function Home() {
 				) : (
 					<ul className="space-y-3">
 						{filteredPushes.map((p) => (
-							<li key={p.id} className="border rounded p-3 bg-gray-50">
-								<div className="text-sm text-gray-500 mb-2">
-									{new Date(p.created_at).toLocaleString('es-ES')}
+							<li key={p.id} className="border rounded p-3 bg-gray-50 relative">
+								<div className="flex justify-between items-start mb-2">
+									<div className="text-sm text-gray-500">
+										{new Date(p.created_at).toLocaleString('es-ES')}
+									</div>
+									<button
+										onClick={() => deletePush(p.id)}
+										className="text-red-600 hover:text-red-800 text-sm font-medium px-2 py-1 rounded hover:bg-red-50"
+										title="Eliminar"
+									>
+										🗑️ Eliminar
+									</button>
 								</div>
 								<a 
 									className="text-blue-600 underline break-all hover:text-blue-800" 
