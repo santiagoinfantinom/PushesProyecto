@@ -1,5 +1,6 @@
 # Reporting App
 
+El app se encuentra en : https://pushes-proyecto-q6lt.vercel.app/
 App Next.js + TypeScript con Supabase para registrar pushes (link de GitHub + comentario) y ver historial.
 
 ## Requisitos
