@@ -1,256 +1,238 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import type { PushItem } from '@/types/push';
-import StatsCards from '@/components/StatsCards';
-import WeeklyChart from '@/components/WeeklyChart';
+import type { Prompt } from '@/types/prompt';
+import type { Idea } from '@/types/idea';
 
 export default function Home() {
-	const [githubLink, setGithubLink] = useState('');
-	const [comment, setComment] = useState('');
-	const [loading, setLoading] = useState(false);
 	const [pushes, setPushes] = useState<PushItem[]>([]);
-	const [filteredPushes, setFilteredPushes] = useState<PushItem[]>([]);
-	const [error, setError] = useState<string | null>(null);
-	const [loadingHistory, setLoadingHistory] = useState(true);
-	const [searchDate, setSearchDate] = useState('');
-
-	async function loadPushes() {
-		setLoadingHistory(true);
-		setError(null);
-		try {
-			const res = await fetch('/api/pushes', { 
-				cache: 'no-store',
-				headers: {
-					'Content-Type': 'application/json',
-				}
-			});
-			
-			if (!res.ok) {
-				throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-			}
-			
-			const data = await res.json();
-			console.log('Loaded pushes:', data); // Debug log
-			
-			if (data.pushes) {
-				setPushes(data.pushes);
-				setFilteredPushes(data.pushes);
-			} else {
-				setPushes([]);
-				setFilteredPushes([]);
-			}
-		} catch (err) {
-			console.error('Error loading pushes:', err);
-			setError(`Error cargando historial: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-		} finally {
-			setLoadingHistory(false);
-		}
-	}
+	const [prompts, setPrompts] = useState<Prompt[]>([]);
+	const [ideas, setIdeas] = useState<Idea[]>([]);
+	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
-		loadPushes();
+		async function loadData() {
+			try {
+				const [pushesRes, promptsRes, ideasRes] = await Promise.all([
+					fetch('/api/pushes', { cache: 'no-store' }),
+					fetch('/api/prompts', { cache: 'no-store' }),
+					fetch('/api/ideas', { cache: 'no-store' }),
+				]);
+
+				const [pushesData, promptsData, ideasData] = await Promise.all([
+					pushesRes.json(),
+					promptsRes.json(),
+					ideasRes.json(),
+				]);
+
+				setPushes(pushesData.pushes || []);
+				setPrompts(promptsData.prompts || []);
+				setIdeas(ideasData.ideas || []);
+			} catch (err) {
+				console.error('Error loading dashboard data:', err);
+			} finally {
+				setLoading(false);
+			}
+		}
+
+		loadData();
 	}, []);
 
-	// Filter pushes by date
-	useEffect(() => {
-		if (!searchDate) {
-			setFilteredPushes(pushes);
-			return;
-		}
-		
-		const searchDateObj = new Date(searchDate);
-		const filtered = pushes.filter(push => {
-			const pushDate = new Date(push.created_at);
-			return pushDate.toDateString() === searchDateObj.toDateString();
-		});
-		setFilteredPushes(filtered);
-	}, [searchDate, pushes]);
+	const recentPushes = pushes.slice(0, 5);
+	const favoritePrompts = prompts.filter(p => p.is_favorite).slice(0, 5);
+	const activeIdeas = ideas.filter(i => i.status === 'in_progress').slice(0, 5);
 
-	async function onSubmit(e: React.FormEvent) {
-		e.preventDefault();
-		setError(null);
-		setLoading(true);
-		
-		try {
-			const res = await fetch('/api/pushes', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ github_link: githubLink, comment })
-			});
-			
-			const data = await res.json();
-			console.log('Save response:', data); // Debug log
-			
-			if (!res.ok) {
-				throw new Error(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`);
-			}
-			
-			// Clear form
-			setGithubLink('');
-			setComment('');
-			
-			// Reload history
-			await loadPushes();
-			
-		} catch (err) {
-			console.error('Error saving push:', err);
-			setError(`Error guardando: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-		} finally {
-			setLoading(false);
-		}
-	}
-
-	async function deletePush(id: string) {
-		if (!confirm('¿Estás seguro de que quieres eliminar este push?')) {
-			return;
-		}
-
-		try {
-			const res = await fetch(`/api/pushes?id=${id}`, {
-				method: 'DELETE',
-			});
-
-			if (!res.ok) {
-				const data = await res.json();
-				throw new Error(data.error || 'Error eliminando');
-			}
-
-			// Reload history
-			await loadPushes();
-		} catch (err) {
-			console.error('Error deleting push:', err);
-			setError(`Error eliminando: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-		}
-	}
+	const ideaStatusCounts = {
+		idea: ideas.filter(i => i.status === 'idea').length,
+		in_progress: ideas.filter(i => i.status === 'in_progress').length,
+		completed: ideas.filter(i => i.status === 'completed').length,
+		on_hold: ideas.filter(i => i.status === 'on_hold').length,
+	};
 
 	return (
-		<div className="max-w-6xl mx-auto p-6 space-y-8">
-			<h1 className="text-3xl font-bold text-center mb-8">Seguimiento de Pushes</h1>
-			
-			{/* Dashboard de Estadísticas */}
-			<StatsCards pushes={pushes} />
-			
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				{/* Formulario */}
-				<div className="space-y-6">
-					<h2 className="text-2xl font-semibold">Agregar Push</h2>
-					<form onSubmit={onSubmit} className="space-y-4">
-						<div>
-							<label className="block text-sm font-medium">Link de GitHub</label>
-							<input
-								type="url"
-								value={githubLink}
-								onChange={(e) => setGithubLink(e.target.value)}
-								placeholder="https://github.com/usuario/repo/commit/sha"
-								className="mt-1 w-full border rounded px-3 py-2"
-								required
-							/>
-						</div>
-						<div>
-							<label className="block text-sm font-medium">Comentario</label>
-							<textarea
-								value={comment}
-								onChange={(e) => setComment(e.target.value)}
-								placeholder="Qué cambiaste en este push"
-								className="mt-1 w-full border rounded px-3 py-2 h-24"
-								required
-							/>
-						</div>
-						<button
-							type="submit"
-							disabled={loading}
-							className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
-						>
-							{loading ? 'Guardando...' : 'Guardar'}
-						</button>
-						{error && <p className="text-red-600 text-sm">{error}</p>}
-					</form>
-				</div>
-				
-				{/* Gráfico Semanal */}
-				<div>
-					<WeeklyChart pushes={pushes} />
-				</div>
+		<div className="max-w-7xl mx-auto p-6 space-y-8">
+			<div className="text-center mb-8 bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg p-6">
+				<h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
+				<p className="text-gray-300">Resumen de tu actividad y proyectos</p>
 			</div>
 
-			{/* Historial */}
-			<div className="space-y-3">
-				<div className="flex justify-between items-center">
-					<h2 className="text-xl font-medium">Historial</h2>
-					<button 
-						onClick={loadPushes}
-						disabled={loadingHistory}
-						className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
-					>
-						{loadingHistory ? 'Cargando...' : 'Actualizar'}
-					</button>
+			{loading ? (
+				<div className="text-center py-12">
+					<div className="text-gray-500">Cargando datos...</div>
 				</div>
-				
-				{/* Date Search Bar */}
-				<div className="flex gap-2 items-center">
-					<label className="text-sm font-medium">Buscar por fecha:</label>
-					<input
-						type="date"
-						value={searchDate}
-						onChange={(e) => setSearchDate(e.target.value)}
-						className="border rounded px-3 py-1 text-sm"
-					/>
-					{searchDate && (
-						<button
-							onClick={() => setSearchDate('')}
-							className="text-sm text-gray-500 hover:text-gray-700"
-						>
-							Limpiar
-						</button>
-					)}
-				</div>
+			) : (
+				<>
+					{/* Estadísticas Principales */}
+					<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+						<Link href="/pushes" className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-6 text-white shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+							<div className="text-4xl font-bold mb-2">{pushes.length}</div>
+							<div className="text-blue-100 font-medium">Total Pushes</div>
+							<div className="text-sm text-blue-200 mt-1">
+								{pushes.length > 0 && `Último: ${new Date(pushes[0].created_at).toLocaleDateString('es-ES')}`}
+							</div>
+						</Link>
 
-				{loadingHistory ? (
-					<div className="text-center py-4">
-						<div className="text-sm text-gray-500">Cargando historial...</div>
+						<Link href="/prompts" className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-6 text-white shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+							<div className="text-4xl font-bold mb-2">{prompts.length}</div>
+							<div className="text-purple-100 font-medium">Total Prompts</div>
+							<div className="text-sm text-purple-200 mt-1">
+								⭐ {prompts.filter(p => p.is_favorite).length} favoritos
+							</div>
+						</Link>
+
+						<Link href="/ideas" className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-6 text-white shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+							<div className="text-4xl font-bold mb-2">{ideas.length}</div>
+							<div className="text-green-100 font-medium">Total Ideas</div>
+							<div className="text-sm text-green-200 mt-1">
+								🚀 {ideaStatusCounts.in_progress} en progreso
+							</div>
+						</Link>
+
+						<div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg p-6 text-white shadow-lg">
+							<div className="text-4xl font-bold mb-2">{ideaStatusCounts.completed}</div>
+							<div className="text-yellow-100 font-medium">Completados</div>
+							<div className="text-sm text-yellow-200 mt-1">
+								✨ Proyectos terminados
+							</div>
+						</div>
 					</div>
-				) : (
-					<ul className="space-y-3">
-						{filteredPushes.map((p) => (
-							<li key={p.id} className="border rounded p-3 bg-gray-50 relative">
-								<div className="flex justify-between items-start mb-2">
-									<div className="text-sm text-gray-500">
-										{new Date(p.created_at).toLocaleString('es-ES')}
-									</div>
-									<button
-										onClick={() => deletePush(p.id)}
-										className="text-red-600 hover:text-red-800 text-sm font-medium px-2 py-1 rounded hover:bg-red-50"
-										title="Eliminar"
-									>
-										🗑️ Eliminar
-									</button>
-								</div>
-								<a 
-									className="text-blue-600 underline break-all hover:text-blue-800" 
-									href={p.github_link} 
-									target="_blank" 
-									rel="noreferrer"
-								>
-									{p.github_link}
-								</a>
-								<p className="mt-2 text-gray-800">{p.comment}</p>
-							</li>
-						))}
-						{filteredPushes.length === 0 && (
-							<li className="text-sm text-gray-500 text-center py-4">
-								{searchDate ? 'No hay pushes en esta fecha' : 'Aún no hay pushes'}
-							</li>
-						)}
-					</ul>
-				)}
-				
-				{error && (
-					<div className="bg-red-50 border border-red-200 rounded p-3">
-						<p className="text-red-600 text-sm">{error}</p>
+
+					{/* Grid de 3 columnas */}
+					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+						{/* Pushes Recientes */}
+						<div className="bg-white rounded-lg shadow-lg p-6 border-t-4 border-blue-500">
+							<div className="flex justify-between items-center mb-4">
+								<h2 className="text-xl font-bold text-gray-800">Pushes Recientes</h2>
+								<Link href="/pushes" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+									Ver todos →
+								</Link>
+							</div>
+							{recentPushes.length > 0 ? (
+								<ul className="space-y-3">
+									{recentPushes.map((push) => (
+										<li key={push.id} className="border-l-4 border-blue-400 pl-3 py-2 bg-blue-50 rounded-r">
+											<div className="text-xs text-gray-500 mb-1">
+												{new Date(push.created_at).toLocaleDateString('es-ES')}
+											</div>
+											<p className="text-sm text-gray-900 line-clamp-2 font-medium">{push.comment}</p>
+										</li>
+									))}
+								</ul>
+							) : (
+								<p className="text-gray-500 text-sm text-center py-8">No hay pushes todavía</p>
+							)}
+						</div>
+
+						{/* Prompts Favoritos */}
+						<div className="bg-white rounded-lg shadow-lg p-6 border-t-4 border-purple-500">
+							<div className="flex justify-between items-center mb-4">
+								<h2 className="text-xl font-bold text-gray-800">Prompts Favoritos</h2>
+								<Link href="/prompts" className="text-sm text-purple-600 hover:text-purple-800 font-medium">
+									Ver todos →
+								</Link>
+							</div>
+							{favoritePrompts.length > 0 ? (
+								<ul className="space-y-3">
+									{favoritePrompts.map((prompt) => (
+										<li key={prompt.id} className="border-l-4 border-purple-400 pl-3 py-2 bg-purple-50 rounded-r">
+											<div className="font-medium text-sm text-gray-800 mb-1">
+												⭐ {prompt.title}
+											</div>
+											<p className="text-xs text-gray-700 line-clamp-2 font-medium">{prompt.content}</p>
+											{prompt.category && (
+												<span className="inline-block mt-1 text-xs px-2 py-0.5 bg-purple-200 text-purple-900 rounded font-semibold">
+													{prompt.category}
+												</span>
+											)}
+										</li>
+									))}
+								</ul>
+							) : (
+								<p className="text-gray-500 text-sm text-center py-8">No hay prompts favoritos</p>
+							)}
+						</div>
+
+						{/* Ideas Activas */}
+						<div className="bg-white rounded-lg shadow-lg p-6 border-t-4 border-green-500">
+							<div className="flex justify-between items-center mb-4">
+								<h2 className="text-xl font-bold text-gray-800">Ideas en Progreso</h2>
+								<Link href="/ideas" className="text-sm text-green-600 hover:text-green-800 font-medium">
+									Ver todas →
+								</Link>
+							</div>
+							{activeIdeas.length > 0 ? (
+								<ul className="space-y-3">
+									{activeIdeas.map((idea) => (
+										<li key={idea.id} className="border-l-4 border-green-400 pl-3 py-2 bg-green-50 rounded-r">
+											<div className="font-medium text-sm text-gray-800 mb-1">
+												{idea.title}
+											</div>
+											<p className="text-xs text-gray-700 line-clamp-2 font-medium">{idea.description}</p>
+											<span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded font-semibold ${
+												idea.priority === 'high' ? 'bg-red-200 text-red-900' :
+												idea.priority === 'medium' ? 'bg-yellow-200 text-yellow-900' :
+												'bg-green-200 text-green-900'
+											}`}>
+												Prioridad: {idea.priority === 'high' ? 'Alta' : idea.priority === 'medium' ? 'Media' : 'Baja'}
+											</span>
+										</li>
+									))}
+								</ul>
+							) : (
+								<p className="text-gray-500 text-sm text-center py-8">No hay ideas en progreso</p>
+							)}
+						</div>
 					</div>
-				)}
-			</div>
+
+					{/* Estado de Ideas */}
+					<div className="bg-white rounded-lg shadow-lg p-6">
+						<h2 className="text-xl font-bold text-gray-900 mb-4">Estado de Ideas y Proyectos</h2>
+						<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+							<div className="text-center p-4 bg-gray-50 rounded-lg border-2 border-gray-400">
+								<div className="text-3xl font-bold text-gray-900">{ideaStatusCounts.idea}</div>
+								<div className="text-sm text-gray-700 mt-1 font-semibold">Ideas</div>
+							</div>
+							<div className="text-center p-4 bg-blue-50 rounded-lg border-2 border-blue-400">
+								<div className="text-3xl font-bold text-blue-900">{ideaStatusCounts.in_progress}</div>
+								<div className="text-sm text-blue-800 mt-1 font-semibold">En Progreso</div>
+							</div>
+							<div className="text-center p-4 bg-green-50 rounded-lg border-2 border-green-400">
+								<div className="text-3xl font-bold text-green-900">{ideaStatusCounts.completed}</div>
+								<div className="text-sm text-green-800 mt-1 font-semibold">Completados</div>
+							</div>
+							<div className="text-center p-4 bg-yellow-50 rounded-lg border-2 border-yellow-400">
+								<div className="text-3xl font-bold text-yellow-900">{ideaStatusCounts.on_hold}</div>
+								<div className="text-sm text-yellow-800 mt-1 font-semibold">En Pausa</div>
+							</div>
+						</div>
+					</div>
+
+					{/* Enlaces Rápidos */}
+					<div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg shadow-lg p-6">
+						<h2 className="text-xl font-bold mb-4 text-white">Acciones Rápidas</h2>
+						<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+							<Link href="/pushes" className="bg-white hover:bg-gray-100 rounded-lg p-4 text-center transition-all">
+								<div className="text-2xl mb-2">🚀</div>
+								<div className="text-sm font-bold text-gray-900">Nuevo Push</div>
+							</Link>
+							<Link href="/prompts" className="bg-white hover:bg-gray-100 rounded-lg p-4 text-center transition-all">
+								<div className="text-2xl mb-2">💡</div>
+								<div className="text-sm font-bold text-gray-900">Nuevo Prompt</div>
+							</Link>
+							<Link href="/ideas" className="bg-white hover:bg-gray-100 rounded-lg p-4 text-center transition-all">
+								<div className="text-2xl mb-2">✨</div>
+								<div className="text-sm font-bold text-gray-900">Nueva Idea</div>
+							</Link>
+							<Link href="/ideas" className="bg-white hover:bg-gray-100 rounded-lg p-4 text-center transition-all">
+								<div className="text-2xl mb-2">📊</div>
+								<div className="text-sm font-bold text-gray-900">Ver Proyectos</div>
+							</Link>
+						</div>
+					</div>
+				</>
+			)}
 		</div>
 	);
 }
