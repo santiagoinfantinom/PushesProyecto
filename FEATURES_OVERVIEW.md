@@ -320,3 +320,4 @@ ReportingApp es tu **centro de comando personal** para:
 
 **¡Empieza a usarla hoy!** 🎯
 
+

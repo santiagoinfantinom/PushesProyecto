@@ -191,3 +191,4 @@ src/
 - Búsqueda por fecha
 - Integración con Supabase
 
+

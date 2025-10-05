@@ -169,3 +169,4 @@ Una vez creadas las tablas:
 - Acceso rápido a todas las secciones
 - Vista previa de elementos recientes
 
+
