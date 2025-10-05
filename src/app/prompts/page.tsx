@@ -77,8 +77,14 @@ export default function PromptsPage() {
 		setFilteredPrompts(filtered);
 	}, [searchQuery, filterCategory, showFavoritesOnly, prompts]);
 
-	// Get unique categories
-	const categories = Array.from(new Set(prompts.map(p => p.category).filter(Boolean)));
+    // Get unique categories as strictly string[] (filter out nulls with type predicate)
+    const categories: string[] = Array.from(
+        new Set(
+            prompts
+                .map(p => p.category)
+                .filter((c): c is string => typeof c === 'string' && c.length > 0)
+        )
+    );
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault();
