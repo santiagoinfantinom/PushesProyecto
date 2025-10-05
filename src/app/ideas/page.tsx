@@ -33,7 +33,7 @@ export default function IdeasPage() {
 	const [title, setTitle] = useState('');
 	const [description, setDescription] = useState('');
 	const [status, setStatus] = useState<Idea['status']>('idea');
-	const [priority, setPriority] = useState<Idea['priority']>('medium');
+	const [priority, setPriority] = useState<Idea['priority']>('media');
 	const [tags, setTags] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [ideas, setIdeas] = useState<Idea[]>([]);
